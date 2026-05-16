@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import transaction
 from django.db.models import Sum
 from django.db.utils import IntegrityError
@@ -193,3 +195,12 @@ def record_payment(
     JournalLine.objects.bulk_create(journal_lines)
 
     return payment
+
+
+def apply_discount(student: Student, amount):
+    # Create journal entry - if we will always be doing this, have a helper function maybe??
+
+    # Create a Discount journal_line
+    # credit accounts receivable
+    # Shouldn't apply a discount that is more than what the student owes - discount should be <= balance
+    pass

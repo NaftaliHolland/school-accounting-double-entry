@@ -6,7 +6,8 @@ from django.test import TestCase
 from .models import (AcademicYear, Account, FeeItem, FeeSchedule, Grade,
                      JournalEntry, JournalLine, Payment, Student,
                      StudentTermCharge, Term)
-from .services import charge_student, get_balance, lock_term, record_payment
+from .services import (apply_discount, charge_student, get_balance, lock_term,
+                       record_payment)
 
 
 class TermTestCase(TestCase):
@@ -306,7 +307,6 @@ class PaymentTestCase(TestCase):
         )
 
         self.assertEqual(get_balance(self.student), Decimal("-700.00"))
-        
 
     def test_payment_raises_when_negative_or_zero(self):
         with self.assertRaises(Exception, msg="amount cannot be <= 0"):
@@ -374,3 +374,90 @@ class PaymentTestCase(TestCase):
             pass
 
         self.assertEqual(JournalEntry.objects.count(), 2)
+
+
+class DiscountTestCase(TestCase):
+    def setUp(self):
+        self.academic_year = AcademicYear.objects.create(
+            label="2025-2026",
+        )
+
+        self.term = Term.objects.create(
+            academic_year=self.academic_year,
+            name="test_term",
+            start_date="2025-11-23",
+            end_date="2025-12-12",
+        )
+        self.grade = Grade.objects.create(
+            name="Test grade"
+        )
+        self.student = Student.objects.create(
+            name="Test Student",
+            grade=self.grade
+        )
+
+        test_fee_item = FeeItem.objects.create(name="test")
+
+        fee_schedule = FeeSchedule.objects.create(
+            grade=self.grade,
+            fee_item=test_fee_item,
+            term=self.term,
+            amount=300.00,
+        )
+
+        self.journal_entry = charge_student(self.student, self.term)
+
+    def test_raises_if_more_than_balance(self):
+
+        with self.assertRaises(Exception):
+            apply_discount(self.student, 500)
+
+    def test_credits_accounts_receivable(self):
+        self.assertEqual(JournalLine.objects.filter(
+            account__code="1001",
+            credit__gt=Decimal("0.00")
+        ).count(), 0)
+
+        apply_discount(self.student, 100)
+
+        self.assertEqual(JournalLine.objects.filter(
+            account__code="1001",
+            credit__gt=Decimal("0.00")
+        ).count(), 1)
+
+    def test_credits_account_receivable_correct_amount(self):
+        apply_discount(self.student, 100)
+
+        line = JournalLine.objects.get(
+            account__code="1001",
+            credit__gt=Decimal("0.00")
+        )
+        self.assertEqual(line.credit, Decimal("100.00"))
+
+    def test_debits_discount_account(self):
+        self.assertEqual(JournalLine.objects.filter(
+            account__code="1004",
+            debit__gt=Decimal("0.00")
+        ).count(), 0)
+
+        apply_discount(self.student, 100)
+
+        self.assertEqual(JournalLine.objects.filter(
+            account__code="1004",
+            debit__gt=Decimal("0.00")
+        ).count(), 1)
+
+    def test_discount_reduces_balance(self):
+        self.assertEqual(get_balance(self.student), 300)
+
+        apply_discount(self.student, 100)
+
+        self.assertEqual(get_balance(self.student), 200)
+
+    def test_zero_or_less_discount_raises(self):
+        with self.assertRaises(Exception):
+            apply_discount(self.student, 0)
+
+        with self.assertRaises(Exception):
+            apply_discount(self.student, -1)
+
