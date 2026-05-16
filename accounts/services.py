@@ -38,7 +38,6 @@ def charge_student(student: Student, term: Term) -> JournalEntry:
 
     journal_entry = JournalEntry.objects.create(
         description="Test charge",
-        reference="WHSKDJF",
         term=term
     )
 
@@ -115,7 +114,7 @@ def record_payment(
         reference: str,
         payment_method: str | None=None,
         paid_on: str | None=None,
-):
+) -> Payment:
     if amount <= 0:
         raise Exception("amount cannot be <= 0")
 
@@ -160,23 +159,36 @@ def record_payment(
         )
 
     elif balance - amount < 0:
-        journal_lines.append(
-            JournalLine(
-                journal_entry=journal_entry,
-                account=accounts_receivable,
-                student=student,
-                credit=balance,
+        if balance > 0:
+            journal_lines.append(
+                JournalLine(
+                    journal_entry=journal_entry,
+                    account=accounts_receivable,
+                    student=student,
+                    credit=balance,
 
+                )
             )
-        )
-        journal_lines.append(
-            JournalLine(
-                journal_entry=journal_entry,
-                account=student_deposit,
-                student=student,
-                credit=amount - balance,
+            remainder = amount - balance
+            if remainder > 0:
+                journal_lines.append(
+                    JournalLine(
+                        journal_entry=journal_entry,
+                        account=student_deposit,
+                        student=student,
+                        credit=remainder,
+                    )
+                )
+
+        elif balance <= 0:
+            journal_lines.append(
+                JournalLine(
+                    journal_entry=journal_entry,
+                    account=student_deposit,
+                    student=student,
+                    credit=amount,
+                )
             )
-        )
 
     JournalLine.objects.bulk_create(journal_lines)
 

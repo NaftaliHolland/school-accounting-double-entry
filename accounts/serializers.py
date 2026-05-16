@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from .models import (AcademicYear, Account, FeeItem, FeeSchedule, Grade,
-                     JournalEntry, JournalLine, Student, Term)
+                     JournalEntry, JournalLine, Payment, Student, Term)
 
 
 class AcademicYearSerializer(serializers.ModelSerializer):
@@ -115,3 +115,24 @@ class JournalLine(serializers.ModelSerializer):
             'credit'
         ]
         read_only_fields = ['id']
+
+
+class PaymentInputSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    payment_method = serializers.ChoiceField(choices=Payment.PAYMENT_METHOD_CHOICES, allow_blank=True)
+    reference = serializers.CharField()
+    paid_on = serializers.DateTimeField()
+
+class PaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = [
+            "id",
+            "amount",
+            "payment_method",
+            "status",
+            "reference",
+            "paid_on",
+            "student",
+            "journal_entry"
+        ]

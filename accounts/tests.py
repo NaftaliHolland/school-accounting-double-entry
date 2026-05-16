@@ -286,6 +286,28 @@ class PaymentTestCase(TestCase):
         self.assertEqual(student_deposit_journal_line.credit, Decimal("200.00"))
         self.assertEqual(student_deposit_journal_line.debit, Decimal("0.00"))
 
+    def test_overpayment_on_already_overpayed_account_correct_balance(self):
+        # This overpays the account by 200
+        payment = record_payment(
+            student=self.student,
+            amount=500,
+            reference="KJKSJDJFJDF",
+            payment_method="cash",
+            paid_on="2025-04-03"
+        )
+
+        # Then we pay again
+        payment = record_payment(
+            student=self.student,
+            amount=500,
+            reference="KJssssJDJFJDF",
+            payment_method="cash",
+            paid_on="2025-04-03"
+        )
+
+        self.assertEqual(get_balance(self.student), Decimal("-700.00"))
+        
+
     def test_payment_raises_when_negative_or_zero(self):
         with self.assertRaises(Exception, msg="amount cannot be <= 0"):
             record_payment(
