@@ -196,11 +196,39 @@ def record_payment(
 
     return payment
 
+@transaction.atomic
+def apply_discount(student: Student, amount) -> JournalEntry:
+    balance = get_balance(student)
 
-def apply_discount(student: Student, amount):
-    # Create journal entry - if we will always be doing this, have a helper function maybe??
+    if amount <= 0:
+        raise Exception("Amount cannot be less than or equal to 0")
 
-    # Create a Discount journal_line
-    # credit accounts receivable
-    # Shouldn't apply a discount that is more than what the student owes - discount should be <= balance
-    pass
+    if amount > balance:
+        raise Exception("Discount cannot be greater than what the student owes")
+
+
+    journal_entry = JournalEntry.objects.create(
+        description=f"Discount applied for {student.name}",
+    )
+
+    AR_account = Account.objects.get(code="1001")
+    discount_account = Account.objects.get(code="1004")
+
+    journal_lines = [
+        JournalLine(
+            journal_entry = journal_entry,
+            account=AR_account,
+            student=student,
+            credit=amount
+        ),
+    JournalLine(
+        journal_entry = journal_entry,
+        account=discount_account,
+        student=student,
+        debit=amount
+    )
+    ]
+
+    JournalLine.objects.bulk_create(journal_lines)
+
+    return journal_entry

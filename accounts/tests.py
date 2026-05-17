@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.db.models import Sum
 from django.db.utils import IntegrityError
 from django.test import TestCase
 
@@ -375,7 +376,6 @@ class PaymentTestCase(TestCase):
 
         self.assertEqual(JournalEntry.objects.count(), 2)
 
-
 class DiscountTestCase(TestCase):
     def setUp(self):
         self.academic_year = AcademicYear.objects.create(
@@ -447,6 +447,27 @@ class DiscountTestCase(TestCase):
             debit__gt=Decimal("0.00")
         ).count(), 1)
 
+    def test_debits_discount_account_correct_amount(self):
+        apply_discount(self.student, 100)
+
+        line = JournalLine.objects.get(
+            account__code="1004",
+            debit__gt=Decimal("0.00")
+        )
+
+        self.assertEqual(line.debit, 100)
+
+    def test_credits_accounts_receivable_correct_amount(self):
+        apply_discount(self.student, 100)
+
+        line = JournalLine.objects.get(
+            account__code="1001",
+            credit__gt=Decimal("0.00")
+        )
+
+        self.assertEqual(line.credit, 100)
+
+
     def test_discount_reduces_balance(self):
         self.assertEqual(get_balance(self.student), 300)
 
@@ -461,3 +482,15 @@ class DiscountTestCase(TestCase):
         with self.assertRaises(Exception):
             apply_discount(self.student, -1)
 
+    def test_discount_journal_entry_balances(self):
+        journal_entry = apply_discount(self.student, 100)
+
+        total_debits = journal_entry.lines.aggregate(
+            total=Sum("debit")
+        )["total"]
+
+        total_credits = journal_entry.lines.aggregate(
+            total=Sum("credit")
+        )["total"]
+
+        self.assertEqual(total_debits, total_credits)
