@@ -8,7 +8,8 @@ from .serializers import (AcademicYearSerializer, FeeItemSerializer,
                           FeeScheduleSerializer, GradeSerializer,
                           PaymentInputSerializer, PaymentSerializer,
                           StudentSerializer, TermSerializer)
-from .services import charge_student, get_balance, record_payment
+from .services import (apply_discount, charge_student, get_balance,
+                       record_payment)
 
 
 class AcademicYearViewSet(viewsets.ModelViewSet):
@@ -96,3 +97,19 @@ class StudentViewSet(viewsets.ModelViewSet):
                 return Response({"error": message}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=["POST"])
+    def apply_discount(self, request, pk=None):
+        amount = request.data.get("amount")
+
+        if not amount:
+            return Response({"error": "amount required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        student = self.get_object()
+
+        try:
+            journal_entry = apply_discount(student=student, amount=amount)
+
+            return Response({"message": "discount applied successfully"}, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
