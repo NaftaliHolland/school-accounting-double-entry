@@ -7,8 +7,9 @@ from django.test import TestCase
 from .models import (AcademicYear, Account, FeeItem, FeeSchedule, Grade,
                      JournalEntry, JournalLine, Payment, Student,
                      StudentTermCharge, Term)
-from .services import (apply_discount, charge_student, get_balance, lock_term,
-                       record_payment)
+from .services import (apply_discount, charge_student, get_balance,
+                       get_charge_type, get_student_ledger,
+                       get_student_summary, lock_term, record_payment)
 
 
 class TermTestCase(TestCase):
@@ -494,3 +495,121 @@ class DiscountTestCase(TestCase):
         )["total"]
 
         self.assertEqual(total_debits, total_credits)
+
+
+
+class StudentSummaryTestCase(TestCase):
+    def setUp(self):
+        self.academic_year = AcademicYear.objects.create(
+            label="2025-2026",
+        )
+
+        self.term = Term.objects.create(
+            academic_year=self.academic_year,
+            name="test_term",
+            start_date="2025-11-23",
+            end_date="2025-12-12",
+        )
+        self.grade = Grade.objects.create(
+            name="Test grade"
+        )
+        self.student = Student.objects.create(
+            name="Test Student",
+            grade=self.grade
+        )
+
+        test_fee_item = FeeItem.objects.create(name="test")
+
+        fee_schedule = FeeSchedule.objects.create(
+            grade=self.grade,
+            fee_item=test_fee_item,
+            term=self.term,
+            amount=300.00,
+        )
+
+    def test_opening_balance_correct(self):
+        pass
+
+    def test_get_charges(self):
+        charge_student(student=self.student, term=self.term)
+
+        summary = get_student_summary(self.student)
+
+        charges = summary["charges"]
+
+        self.assertEqual(charges, 300)
+
+    def test_get_payments(self):
+
+        charge_student(student=self.student, term=self.term)
+
+        record_payment(
+            student=self.student,
+            amount=200,
+            reference="KJSKJD",
+            payment_method="mpesa",
+        )
+
+        record_payment(
+            student=self.student,
+            amount=50,
+            reference="KJS",
+            payment_method="mpesa",
+        )
+
+
+        summary = get_student_summary(self.student)
+
+        payments = summary["payments"]
+
+        self.assertEqual(payments, 250)
+
+
+    def test_get_discounts(self):
+        charge_student(student=self.student, term=self.term)
+
+        apply_discount(student=self.student, amount=200)
+
+        summary = get_student_summary(self.student)
+
+        self.assertEqual(summary["discounts"], Decimal('200.00'))
+
+    def test_get_deposits_applied(self):
+        pass
+
+    def test_get_closing_balance(self):
+
+        # just the current balance
+        charge_student(student=self.student, term=self.term)
+        record_payment(
+            student=self.student,
+            amount=50,
+            reference="KJS",
+            payment_method="mpesa",
+        )
+
+        self.assertEqual(get_balance(self.student), Decimal("250.00"))
+
+
+class StudentEntriesTestCase(TestCase):
+
+    def setUp(self):
+        pass
+
+    # Note sure what to test yet
+
+
+
+
+# Charge types
+# If normal_side is debit and we debit then that's a charge but if normal_side is charge and that is that is a discount account(contra revenue) then it is not a charge nor a payment it is discount
+# if normal_side credit and we credit thats a 
+class ChargeTypeTestCase(TestCase):
+    def test_charge(self):
+        self.assertEqual(get_charge_type("debit", debit=200), "charge")
+
+    def test_payment_discount(self):
+        self.assertEqual(get_charge_type("debit", debit=200), "charge")
+
+    def test_payment_not_discount(self):
+        self.assertEqual(get_charge_type("debit", debit=200), "charge")

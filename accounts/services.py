@@ -232,3 +232,123 @@ def apply_discount(student: Student, amount) -> JournalEntry:
     JournalLine.objects.bulk_create(journal_lines)
 
     return journal_entry
+
+
+def get_student_summary(student: Student) -> dict:
+
+    summary = dict()
+
+    charges_total = JournalLine.objects.filter(
+        account__code="1001",
+        student=student
+    ).aggregate(total=Sum("debit"))["total"]
+
+    summary["charges"] = charges_total
+
+    payments_total = JournalLine.objects.filter(
+        account__code="1001",
+        student=student
+    ).aggregate(total=Sum("credit"))["total"]
+
+    summary["payments"] = payments_total
+
+    discounts_total = JournalLine.objects.filter(
+        account__code="1004",
+        student=student
+    ).aggregate(total=Sum("debit"))["total"]
+
+    summary["discounts"] = discounts_total
+
+#  "summary": {
+#    "charges": 45000,
+#    "payments": 30000,
+#    "discounts": 5000,
+#    "deposits_applied": 2000,
+#    "closing_balance": 20000
+#  },
+
+    return summary
+
+def get_charge_type(normal_side: str, credit=0, debit=0):
+
+    if normal_side == "credit" and credit > 0:
+        return "payment"
+    elif normal_side == "debit" and debit > 0:
+        return "charge"
+def get_student_ledger(student: Student):
+
+    ledger = dict()
+
+    ledger["student"] = {
+        "id": student.id,
+        "name": student.name
+    }
+
+    journal_lines = JournalLines.objects.filter(
+        student=student,
+        account__code__in = ["1001", "1002", "1004"]
+    )
+
+    entries = list()
+
+    for journal_line in journal_lines:
+        entries.append(
+            {
+                "id": journal_line.id,
+                "date": journal_line.journal_entry.created_at,
+            }
+        )
+
+
+#{
+#  "student": {
+#    "id": "stu_123",
+#    "name": "John Doe"
+#  },
+#
+#  "entries": [
+#    {
+#      "id": "txn_001",
+#      "date": "2026-01-10",
+#      "type": "charge",
+#      "reference": "INV-2026-001",
+#      "description": "Term 1 Tuition",
+#      "debit": 45000,
+#      "credit": 0,
+#      "running_balance": 45000,
+#      "account": {
+#        "code": "1001",
+#        "name": "Accounts Receivable"
+#      }
+#    },
+#    {
+#      "id": "txn_002",
+#      "date": "2026-01-15",
+#      "type": "payment",
+#      "reference": "RCPT-2026-002",
+#      "description": "M-Pesa Payment",
+#      "debit": 0,
+#      "credit": 30000,
+#      "running_balance": 15000,
+#      "account": {
+#        "code": "1001",
+#        "name": "Accounts Receivable"
+#      },
+#      "payment_method": "mpesa"
+#    },
+#    {
+#      "id": "txn_003",
+#      "date": "2026-01-20",
+#      "type": "discount",
+#      "reference": "DISC-001",
+#      "description": "Scholarship",
+#      "debit": 0,
+#      "credit": 5000,
+#      "running_balance": 10000,
+#      "account": {
+#        "code": "1004",
+#        "name": "Discount"
+#      }
+#    }
+#  ]
+#}

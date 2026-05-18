@@ -113,3 +113,7 @@ class StudentViewSet(viewsets.ModelViewSet):
             return Response({"message": "discount applied successfully"}, status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=["GET"])
+    def ledger(self, request, pk=None):
+        pass
